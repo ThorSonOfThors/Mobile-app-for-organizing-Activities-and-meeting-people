@@ -1,0 +1,2 @@
+# Mobile-app-for-organizing-Activities-and-meeting-people
+This app uses Jetpack Compose for frontend and Java Spring for backend. This app features authentication(register and login, make requests with JWT token, token rotations included), user can create an activity , backend automatically creates a chat , users can join activities and will be joined to chats , users can send private messages and edit pr
