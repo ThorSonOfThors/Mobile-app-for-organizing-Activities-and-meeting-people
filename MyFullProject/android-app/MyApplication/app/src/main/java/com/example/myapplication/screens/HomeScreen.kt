@@ -27,8 +27,11 @@ import retrofit2.Response
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.safeDrawingPadding
+import com.example.myapplication.components.NotificationBell
+import com.example.myapplication.models.Notification
+
+import androidx.navigation.NavController
 
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.MapEventsOverlay
@@ -42,11 +45,18 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 // ---------------- SCREEN ----------------
 
 @Composable
-fun HomeScreen(userId: Long?) {
+fun HomeScreen(
+    userId: Long?,
+    navController: NavController) {
 
 
     var activities by remember { mutableStateOf<List<Activity>>(emptyList()) }
     var showDialog by remember { mutableStateOf(false) }
+
+    var notifications by remember {
+        mutableStateOf<List<Notification>>(emptyList())
+    }
+
 
     val context = LocalContext.current
 
@@ -73,7 +83,38 @@ fun HomeScreen(userId: Long?) {
 
                 override fun onFailure(call: Call<List<Activity>>, t: Throwable) {}
             })
+
+        if (userId != null) {
+
+            RetrofitInstance.api
+                .getNotifications(userId)
+                .enqueue(object : Callback<List<Notification>> {
+
+                    override fun onResponse(
+                        call: Call<List<Notification>>,
+                        response: Response<List<Notification>>
+                    ) {
+
+                        if (response.isSuccessful) {
+
+                            notifications =
+                                response.body() ?: emptyList()
+                        }
+                    }
+
+                    override fun onFailure(
+                        call: Call<List<Notification>>,
+                        t: Throwable
+                    ) {
+                        t.printStackTrace()
+                    }
+                })
+        }
     }
+
+
+
+
 
     Box(modifier = Modifier.fillMaxSize()) {
 
@@ -139,6 +180,148 @@ fun HomeScreen(userId: Long?) {
 
                 mapView.invalidate()
             }
+        )
+
+        // ---------------- NOTIFICATIONS ----------------
+
+        NotificationBell(
+            notifications = notifications,
+
+            onNotificationClicked = { notification: Notification ->
+
+                if (userId != null) {
+
+                    // Mark notification as seen locally immediately
+                    notifications = notifications.map { currentNotification: Notification ->
+
+                        if (
+                            currentNotification.notificationId ==
+                            notification.notificationId
+                        ) {
+                            currentNotification.copy(seen = true)
+                        } else {
+                            currentNotification
+                        }
+                    }
+
+                    // Mark notification as seen on backend
+                    RetrofitInstance.api
+                        .markNotificationAsSeen(
+                            notification.notificationId,
+                            userId
+                        )
+                        .enqueue(object : Callback<Void> {
+
+                            override fun onResponse(
+                                call: Call<Void>,
+                                response: Response<Void>
+                            ) {
+                                if (!response.isSuccessful) {
+                                    println(
+                                        "Failed to mark notification as seen: ${response.code()}"
+                                    )
+                                }
+                            }
+
+                            override fun onFailure(
+                                call: Call<Void>,
+                                t: Throwable
+                            ) {
+                                t.printStackTrace()
+                            }
+                        })
+
+                    // Navigate according to notification type
+                    when (notification.type) {
+
+                        "FRIEND_REQUEST_RECEIVED",
+                        "FRIEND_REQUEST_ACCEPTED" -> {
+
+                            notification.actorUserId?.let { targetUserId: Long ->
+
+                                navController.navigate(
+                                    "userProfile/$targetUserId"
+                                )
+                            }
+                        }
+
+                        "ACTIVITY_JOINED" -> {
+
+                            println(
+                                "ACTIVITY_JOINED notification: " +
+                                        "notificationId=${notification.notificationId}, " +
+                                        "activityId=${notification.activityId}, " +
+                                        "chatId=${notification.chatId}, " +
+                                        "actorUserId=${notification.actorUserId}"
+                            )
+
+                            val chatId = notification.chatId
+
+                            if (chatId != null) {
+
+                                navController.navigate(
+                                    "chat/$chatId"
+                                )
+
+                            } else {
+
+                                println(
+                                    "ERROR: ACTIVITY_JOINED notification has NULL chatId"
+                                )
+                            }
+                        }
+
+                        "NEW_MESSAGE" -> {
+
+                            notification.chatId?.let { chatId: Long ->
+
+                                navController.navigate(
+                                    "chat/$chatId"
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+
+            onMarkAllAsSeen = {
+
+                if (userId != null) {
+
+                    // Update UI immediately
+                    notifications = notifications.map { notification: Notification ->
+                        notification.copy(seen = true)
+                    }
+
+                    // Update backend
+                    RetrofitInstance.api
+                        .markAllNotificationsAsSeen(userId)
+                        .enqueue(object : Callback<Void> {
+
+                            override fun onResponse(
+                                call: Call<Void>,
+                                response: Response<Void>
+                            ) {
+                                if (!response.isSuccessful) {
+                                    println(
+                                        "Failed to mark all notifications as seen: ${response.code()}"
+                                    )
+                                }
+                            }
+
+                            override fun onFailure(
+                                call: Call<Void>,
+                                t: Throwable
+                            ) {
+                                t.printStackTrace()
+                            }
+                        })
+                }
+            },
+
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
         )
 
         // ---------------- FAB ----------------
@@ -462,8 +645,6 @@ fun CreateActivityDialog(
 
                 }
 
-
-                // -------- MAP --------
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

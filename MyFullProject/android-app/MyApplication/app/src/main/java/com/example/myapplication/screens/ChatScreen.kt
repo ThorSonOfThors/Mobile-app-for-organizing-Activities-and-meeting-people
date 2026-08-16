@@ -59,7 +59,7 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var isGroup by remember {
-        mutableStateOf(true)
+        mutableStateOf(false)
     }
 
     var otherUserId by remember {
@@ -127,37 +127,45 @@ fun ChatScreen(
                         response.body()?.let { header ->
 
                             Log.d(
-                                                    "CHAT_HEADER_DEBUG",
-                                                    """
-                            isGroup=${header.isGroup}
-                            
-                            otherUserId=${header.otherUserId}
-                            otherUserName=${header.otherUserName}
-                            image=${header.otherUserProfileImageId}
-                            activity=${header.activityTitle}
-                            participants=${header.participantCount}
-                            """.trimIndent()
+                                "CHAT_HEADER_DEBUG",
+                                """
+            privateChat=${header.privateChat}
+            isGroup=${header.isGroup}
+
+            otherUserId=${header.otherUserId}
+            otherUserName=${header.otherUserName}
+            image=${header.otherUserProfileImageId}
+            activity=${header.activityTitle}
+            participants=${header.participantCount}
+            """.trimIndent()
                             )
 
+                            isGroup = !header.privateChat
 
-                            isGroup = header.isGroup
+                            Log.e(
+                                "========== CHAT TYPE ==========",
+                                """
+            CHAT ID: $chatId
+            BACKEND privateChat: ${header.privateChat}
+            BACKEND isGroup: ${header.isGroup}
+            LOCAL isGroup AFTER SET: $isGroup
+            otherUserId: ${header.otherUserId}
+            otherUserName: ${header.otherUserName}
+            otherUserImage: ${header.otherUserProfileImageId}
+            activityTitle: ${header.activityTitle}
+            participantCount: ${header.participantCount}
+            ===============================
+            """.trimIndent()
+                            )
 
                             participantCount = header.participantCount
-
-                            participants = header.participants ?: emptyList()
-
+                            participants = header.participants
 
                             otherUserId = header.otherUserId
-
                             otherUserName = header.otherUserName ?: ""
-
                             otherUserImage = header.otherUserProfileImageId
-
-
                             activityTitle = header.activityTitle ?: ""
-
                         }
-
                     } else {
 
                         Log.e(
@@ -238,72 +246,7 @@ fun ChatScreen(
 
         if (isGroup) {
 
-            Surface(
-                tonalElevation = 8.dp,
-                shadowElevation = 4.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        otherUserId?.let {
-                            navController.navigate("userProfile/$it")
-                        }
-                    }
-            ) {
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    val imageUrl = getProfileImageUrl(otherUserImage)
-
-                    if (imageUrl != null) {
-
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = otherUserName,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-
-                    } else {
-
-                        Surface(
-                            modifier = Modifier.size(40.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = otherUserName
-                                        .firstOrNull()
-                                        ?.toString()
-                                        ?: "?"
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(
-                        modifier = Modifier.width(12.dp)
-                    )
-
-                    Text(
-                        text = otherUserName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-        } else {
-
+            // GROUP CHAT
             Surface(
                 tonalElevation = 8.dp,
                 shadowElevation = 4.dp,
@@ -370,13 +313,86 @@ fun ChatScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = participant.name.first().toString()
+                                            text = participant.name
+                                                .firstOrNull()
+                                                ?.toString()
+                                                ?: "?"
                                         )
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
+
+        } else {
+
+            // PRIVATE CHAT
+            Surface(
+                tonalElevation = 8.dp,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        otherUserId?.let {
+                            navController.navigate("userProfile/$it")
+                        }
+                    }
+            ) {
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    val imageUrl =
+                        getProfileImageUrl(otherUserImage)
+
+                    if (imageUrl != null) {
+
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = otherUserName,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+
+                    } else {
+
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+
+                            Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+
+                                Text(
+                                    text = otherUserName
+                                        .firstOrNull()
+                                        ?.toString()
+                                        ?: "?"
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(
+                        modifier = Modifier.width(12.dp)
+                    )
+
+                    Text(
+                        text = otherUserName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

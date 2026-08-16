@@ -1,0 +1,26 @@
+CREATE TABLE Notifications (
+    notification_id BIGSERIAL PRIMARY KEY,
+
+    user_id BIGINT NOT NULL,
+
+    type VARCHAR(50) NOT NULL,
+
+    title VARCHAR(255) NOT NULL,
+    message TEXT,
+
+    actor_user_id BIGINT,
+
+    activity_id BIGINT,
+    chat_id BIGINT,
+    message_id BIGINT,
+
+    is_seen BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES Users(user_id),
+    FOREIGN KEY (actor_user_id) REFERENCES Users(user_id),
+    FOREIGN KEY (activity_id) REFERENCES Activity(activity_id),
+    FOREIGN KEY (chat_id) REFERENCES Chats(chat_id),
+    FOREIGN KEY (message_id) REFERENCES Messages(message_id)
+);

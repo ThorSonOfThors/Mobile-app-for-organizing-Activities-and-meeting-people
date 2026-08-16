@@ -16,6 +16,8 @@ import com.example.springbackend.repository.ActivityRepository;
 import com.example.springbackend.repository.ChatRepository;
 import com.example.springbackend.repository.ChatUserRepository;
 import com.example.springbackend.repository.UserRepository;
+import com.example.springbackend.entity.NotificationType;
+import com.example.springbackend.service.NotificationService;
 
 @Service
 public class ActivityService {
@@ -25,19 +27,22 @@ public class ActivityService {
     private final ChatRepository chatRepository;
     private final ChatUserRepository chatUserRepository;
     private final ChatService chatService;
+    private final NotificationService notificationService;
 
     public ActivityService(
             ActivityRepository activityRepository,
             UserRepository userRepository,
             ChatRepository chatRepository,
             ChatUserRepository chatUserRepository,
-            ChatService chatService
+            ChatService chatService,
+            NotificationService notificationService
     ) {
         this.activityRepository = activityRepository;
         this.userRepository = userRepository;
         this.chatRepository = chatRepository;
         this.chatUserRepository = chatUserRepository;
         this.chatService = chatService;
+        this.notificationService = notificationService;
     }
 
     // CREATE - Returns ActivityResponse with creator name
@@ -84,6 +89,7 @@ public class ActivityService {
     }
 
     // JOIN ACTIVITY - Returns ActivityResponse
+    // JOIN ACTIVITY - Returns ActivityResponse
     public ActivityResponse joinActivity(Long activityId, Long userId) {
 
         System.out.println("Join Activity");
@@ -96,11 +102,35 @@ public class ActivityService {
 
         // prevent duplicate joins
         if (!activity.getParticipants().contains(user)) {
+
             activity.getParticipants().add(user);
+
             System.out.println("Before addUserToChat");
-            chatService.addUserToChat(activity.getChatId(), userId);
+
+            chatService.addUserToChat(
+                    activity.getChatId(),
+                    userId
+            );
+
             System.out.println("After addUserToChat");
+
             activityRepository.save(activity);
+
+            // Notify activity creator that someone joined
+            // Notify activity creator that someone joined
+            if (!activity.getCreatorId().equals(userId)) {
+
+                notificationService.createNotification(
+                        activity.getCreatorId(),
+                        NotificationType.ACTIVITY_JOINED,
+                        "Activity joined",
+                        user.getName() + " joined your " + activity.getTitle() + " activity",
+                        userId,
+                        activity.getActivityId(),
+                        activity.getChatId(),
+                        null
+                );
+            }
         }
 
         // Get creator for the response

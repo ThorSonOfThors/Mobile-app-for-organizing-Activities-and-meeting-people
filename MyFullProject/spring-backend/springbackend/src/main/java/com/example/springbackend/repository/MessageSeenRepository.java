@@ -13,4 +13,6 @@ public interface MessageSeenRepository extends JpaRepository<MessageSeen, Long> 
 
     long countByMessageId(Long messageId);
 
+    
+
 }

@@ -16,6 +16,7 @@ import com.example.myapplication.models.FriendshipStatusDto
 import com.example.myapplication.models.LoginResponse
 import com.example.myapplication.models.LogoutRequest
 import com.example.myapplication.models.MessageDto
+import com.example.myapplication.models.Notification
 import com.example.myapplication.models.Participant
 import com.example.myapplication.models.PrivateChatLookupResponse
 import com.example.myapplication.models.RefreshRequest
@@ -241,5 +242,34 @@ interface ApiService {
         @Path("otherUserId") otherUserId: Long
     ): Call<PrivateChatLookupResponse>
 
+
+
+    // ==================== NOTIFICATIONS ====================
+
+    @GET("api/notifications/{userId}")
+    fun getNotifications(
+        @Path("userId") userId: Long
+    ): Call<List<Notification>>
+
+    @GET("api/notifications/{userId}/unseen")
+    fun getUnseenNotifications(
+        @Path("userId") userId: Long
+    ): Call<List<Notification>>
+
+    @GET("api/notifications/{userId}/unread-count")
+    fun getUnreadNotificationCount(
+        @Path("userId") userId: Long
+    ): Call<Long>
+
+    @PATCH("api/notifications/{notificationId}/seen")
+    fun markNotificationAsSeen(
+        @Path("notificationId") notificationId: Long,
+        @Query("userId") userId: Long
+    ): Call<Void>
+
+    @PATCH("api/notifications/{userId}/seen-all")
+    fun markAllNotificationsAsSeen(
+        @Path("userId") userId: Long
+    ): Call<Void>
 
 }

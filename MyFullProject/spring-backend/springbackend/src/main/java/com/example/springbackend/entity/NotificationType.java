@@ -1,0 +1,18 @@
+package com.example.springbackend.entity;
+
+public enum NotificationType {
+
+    NEW_MESSAGE,
+
+    FRIEND_REQUEST_RECEIVED,
+    FRIEND_REQUEST_ACCEPTED,
+
+    ACTIVITY_JOINED,
+    ACTIVITY_JOIN_REQUEST,
+    ACTIVITY_UPDATED,
+    ACTIVITY_CANCELLED,
+
+    ACTIVITY_CHAT_MESSAGE,
+
+    SYSTEM
+}

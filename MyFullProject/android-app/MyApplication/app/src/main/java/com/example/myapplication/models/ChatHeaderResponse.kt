@@ -10,6 +10,8 @@ data class ChatHeaderResponse(
 
     val isGroup: Boolean,
 
+    val privateChat: Boolean,
+
     val otherUserId: Long?,
 
     val otherUserName: String?,

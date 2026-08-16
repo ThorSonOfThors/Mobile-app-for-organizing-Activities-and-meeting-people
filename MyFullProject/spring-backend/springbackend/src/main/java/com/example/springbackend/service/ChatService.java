@@ -3,6 +3,7 @@ package com.example.springbackend.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,10 @@ import com.example.springbackend.repository.ChatUserRepository;
 import com.example.springbackend.repository.MessageRepository;
 import com.example.springbackend.repository.UserRepository;
 import com.example.springbackend.repository.MessageSeenRepository;
+import com.example.springbackend.repository.NotificationRepository;
+import com.example.springbackend.entity.NotificationType;
+
+
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +41,8 @@ public class ChatService {
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final MessageSeenRepository messageSeenRepository;
+    private final NotificationService notificationService;
+
 
     public ChatService(
             ChatRepository chatRepository,
@@ -43,7 +50,8 @@ public class ChatService {
             ActivityRepository activityRepository,
             UserRepository userRepository,
             MessageRepository messageRepository,
-            MessageSeenRepository messageSeenRepository
+            MessageSeenRepository messageSeenRepository,
+            NotificationService notificationService
     ) {
         this.chatRepository = chatRepository;
         this.chatUserRepository = chatUserRepository;
@@ -51,6 +59,7 @@ public class ChatService {
         this.userRepository = userRepository;
         this.messageRepository = messageRepository;
         this.messageSeenRepository = messageSeenRepository;
+        this.notificationService = notificationService;
     }
 
     public Chat createChat(
@@ -103,13 +112,46 @@ public class ChatService {
         System.out.println("User added to chat.");
     }
 
-    public List<Chat> getUserChats(Long userId) {
+
+
+
+   public List<Chat> getUserChats(Long userId) {
 
         List<Chat> chats = chatRepository.findChatsByUserId(userId);
 
         for (Chat chat : chats) {
 
-                // Only modify private chats
+                // Default values
+                chat.setLastMessage(null);
+                chat.setUnread(false);
+                chat.setOtherUserProfilePhoto(null);
+
+                // Find latest message
+                Optional<Message> latestMessage =
+                        messageRepository.findTopByChatIdOrderBySentAtDesc(
+                                chat.getChatId()
+                        );
+
+                if (latestMessage.isPresent()) {
+
+                Message message = latestMessage.get();
+
+                chat.setLastMessage(message.getContent());
+
+                // Only messages from other users can be unread
+                if (!message.getSenderId().equals(userId)) {
+
+                        boolean seen =
+                                messageSeenRepository.existsByMessageIdAndUserId(
+                                        message.getMessageId(),
+                                        userId
+                                );
+
+                        chat.setUnread(!seen);
+                }
+                }
+
+                // Private chat
                 if (!chat.getIsGroup()) {
 
                 List<ChatUser> members =
@@ -124,6 +166,12 @@ public class ChatService {
                                 .orElseThrow();
 
                         chat.setName(otherUser.getName());
+
+                        chat.setOtherUserProfilePhoto(
+                                otherUser.getProfileImageId() != null
+                                        ? otherUser.getProfileImageId().toString()
+                                        : null
+                        );
 
                         break;
                         }
@@ -166,12 +214,14 @@ public class ChatService {
             });
 
 
-    System.out.println(
-            "Chat loaded successfully. ID=" 
-            + chat.getChatId()
-            + " isGroup="
-            + chat.getIsGroup()
-    );
+    System.out.println();
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("!!! CHAT ENTITY DEBUG !!!");
+        System.out.println("!!! chatId   = " + chat.getChatId());
+        System.out.println("!!! name     = " + chat.getName());
+        System.out.println("!!! isGroup  = " + chat.getIsGroup());
+        System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println();
 
 
     List<ChatUser> chatUsers =
@@ -231,6 +281,9 @@ public class ChatService {
     ChatHeaderResponse response =
             new ChatHeaderResponse();
 
+
+
+    response.setIsGroup(Boolean.TRUE.equals(chat.getIsGroup()));
 
     response.setParticipantCount(participants.size());
     response.setParticipants(participants);
@@ -340,10 +393,16 @@ public class ChatService {
     }
 
 
-    System.out.println(
-            "Response prepared. privateChat="
-            + response.isPrivateChat()
-    );
+    System.out.println();
+        System.out.println("1!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println("!!! CHAT RESPONSE DEBUG !!!");
+        System.out.println("!!! isGroup       = " + response.isGroup());
+        System.out.println("!!! privateChat   = " + response.isPrivateChat());
+        System.out.println("!!! activityId    = " + response.getActivityId());
+        System.out.println("!!! activityTitle = " + response.getActivityTitle());
+        System.out.println("!!! otherUserId   = " + response.getOtherUserId());
+        System.out.println("1!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        System.out.println();
 
     System.out.println("========== CHAT HEADER END ==========");
 
@@ -410,53 +469,87 @@ public class ChatService {
 
 
     public MessageDto sendMessage(
-            Long chatId,
-            SendMessageRequest request
-    ) {
+                Long chatId,
+                SendMessageRequest request
+        ) {
 
-        User sender = userRepository
-                .findById(request.getSenderId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                User sender = userRepository
+                        .findById(request.getSenderId())
+                        .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Message message = new Message();
+                Message message = new Message();
 
-        System.out.println("replyToMessageId = " + request.getReplyToMessageId());
-        System.out.println("replyPreview = " + request.getReplyPreview());
-        System.out.println("replySenderName = " + request.getReplySenderName());
+                System.out.println("replyToMessageId = " + request.getReplyToMessageId());
+                System.out.println("replyPreview = " + request.getReplyPreview());
+                System.out.println("replySenderName = " + request.getReplySenderName());
 
-        message.setChatId(chatId);
-        message.setSenderId(request.getSenderId());
-        message.setContent(request.getContent());
+                message.setChatId(chatId);
+                message.setSenderId(request.getSenderId());
+                message.setContent(request.getContent());
 
-        if(request.getReplyToMessageId() != null){
-            message.setReplyToMessageId(request.getReplyToMessageId());
-            message.setReplyPreview(request.getReplyPreview());
-            message.setReplySenderName(request.getReplySenderName());
+                if (request.getReplyToMessageId() != null) {
+                        message.setReplyToMessageId(request.getReplyToMessageId());
+                        message.setReplyPreview(request.getReplyPreview());
+                        message.setReplySenderName(request.getReplySenderName());
+                }
+
+                message.setStatus("sent");
+                message.setSentAt(LocalDateTime.now());
+
+                // Save message first
+                message = messageRepository.save(message);
+
+
+                // ============================================================
+                // CREATE NOTIFICATIONS
+                // ============================================================
+
+                List<ChatUser> chatUsers =
+                        chatUserRepository.findByChatId(chatId);
+
+                for (ChatUser chatUser : chatUsers) {
+
+                        Long recipientId = chatUser.getUserId();
+
+                        // Do not notify the person who sent the message
+                        if (recipientId.equals(sender.getId())) {
+                        continue;
+                        }
+
+                        notificationService.createNotification(
+                                recipientId,
+                                NotificationType.NEW_MESSAGE,
+                                "New message",
+                                sender.getName() + " sent you a message",
+                                sender.getId(),
+                                null,
+                                chatId,
+                                message.getMessageId()
+                        );
+                }
+
+
+                // ============================================================
+                // BUILD RESPONSE DTO
+                // ============================================================
+
+                MessageDto dto = new MessageDto();
+
+                dto.setId(message.getMessageId());
+                dto.setSenderId(sender.getId());
+                dto.setSenderName(sender.getName());
+                dto.setProfileImageId(sender.getProfileImageId());
+
+                dto.setReplyToMessageId(message.getReplyToMessageId());
+                dto.setReplyPreview(message.getReplyPreview());
+                dto.setReplySenderName(message.getReplySenderName());
+
+                dto.setContent(message.getContent());
+                dto.setStatus(message.getStatus());
+                dto.setSentAt(message.getSentAt());
+
+                return dto;
         }
-
-        message.setStatus("sent");
-
-        message.setSentAt(LocalDateTime.now());
-
-        message = messageRepository.save(message);
-
-        MessageDto dto = new MessageDto();
-
-        dto.setId(message.getMessageId());
-        dto.setSenderId(sender.getId());
-        dto.setSenderName(sender.getName());
-        dto.setProfileImageId(sender.getProfileImageId());
-
-        dto.setReplyToMessageId(message.getReplyToMessageId());
-        dto.setReplyPreview(message.getReplyPreview());
-        dto.setReplySenderName(message.getReplySenderName());
-
-        dto.setContent(message.getContent());
-        dto.setStatus(message.getStatus());
-        dto.setSentAt(message.getSentAt());
-
-        return dto;
-    }
 
 
     public void markMessagesAsSeen(Long chatId, Long viewerId) {

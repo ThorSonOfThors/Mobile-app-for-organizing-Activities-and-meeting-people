@@ -16,6 +16,8 @@ public class ChatHeaderResponse {
 
     private Integer participantCount;
 
+    private boolean isGroup;
+
     private Long otherUserId;
 
     private String otherUserName;
@@ -24,5 +26,15 @@ public class ChatHeaderResponse {
 
     private List<ParticipantDto> participants;
 
+ 
     // getters/setters
+
+
+    public boolean isGroup() {
+    return isGroup;
+    }
+
+    public void setIsGroup(boolean isGroup) {
+        this.isGroup = isGroup;
+    }
 }

@@ -42,7 +42,8 @@ fun AppNavigation() {
 
             composable("home") {
                 HomeScreen(
-                    userId = SessionManager.currentUserId
+                    userId = SessionManager.currentUserId,
+                    navController = navController
                 )
             }
 

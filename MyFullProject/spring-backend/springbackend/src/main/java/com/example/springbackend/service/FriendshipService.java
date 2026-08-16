@@ -20,6 +20,9 @@ import com.example.springbackend.model.FriendshipStatus;
 import com.example.springbackend.repository.FriendshipRepository;
 import com.example.springbackend.repository.UserRepository;
 
+import com.example.springbackend.entity.NotificationType;
+import com.example.springbackend.service.NotificationService;
+
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -28,71 +31,120 @@ public class FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
-    public FriendshipService(FriendshipRepository friendshipRepository , UserRepository userRepository) {
+    public FriendshipService(
+        FriendshipRepository friendshipRepository ,
+        UserRepository userRepository,
+        NotificationService notificationService) {
         this.friendshipRepository = friendshipRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        
     }
 
 
     public Friendship sendFriendRequest(
-            Long senderId,
-            Long receiverId
-    ) {
+        Long senderId,
+        Long receiverId
+        ) {
+                if (senderId.equals(receiverId)) {
+                        throw new RuntimeException("You cannot add yourself.");
+                }
 
-        if (senderId.equals(receiverId)) {
-            throw new RuntimeException("You cannot add yourself.");
-        }
+                friendshipRepository
+                        .findBySenderIdAndReceiverIdOrSenderIdAndReceiverId(
+                                senderId,
+                                receiverId,
+                                receiverId,
+                                senderId
+                        )
+                        .ifPresent(f -> {
+                                throw new RuntimeException(
+                                        "Friendship already exists."
+                                );
+                        });
 
-        friendshipRepository
-                .findBySenderIdAndReceiverIdOrSenderIdAndReceiverId(
+                Friendship friendship = new Friendship();
+
+                friendship.setCreatedAt(LocalDateTime.now());
+                friendship.setSenderId(senderId);
+                friendship.setReceiverId(receiverId);
+                friendship.setStatus(FriendshipStatus.PENDING);
+
+                Friendship savedFriendship =
+                        friendshipRepository.save(friendship);
+
+
+                // Get sender's name for the notification
+                User sender = userRepository.findById(senderId)
+                        .orElseThrow(() -> new RuntimeException("Sender not found"));
+
+
+                // Create notification for the person receiving the request
+                notificationService.createNotification(
+                        receiverId,
+                        NotificationType.FRIEND_REQUEST_RECEIVED,
+                        "New friend request",
+                        sender.getName() + " has sent you a friend request",
                         senderId,
-                        receiverId,
-                        receiverId,
-                        senderId
-                )
-                .ifPresent(f -> {
-                    throw new RuntimeException(
-                            "Friendship already exists."
-                    );
-                });
-
-        Friendship friendship = new Friendship();
-
-        friendship.setCreatedAt(LocalDateTime.now());
-        friendship.setSenderId(senderId);
-        friendship.setReceiverId(receiverId);
-        friendship.setStatus(FriendshipStatus.PENDING);
-
-        return friendshipRepository.save(friendship);
-    }
+                        null,
+                        null,
+                        null
+                );
 
 
-    public Friendship acceptFriendRequest(
-            Long friendshipId,
-            Long receiverId
-    ) {
-
-        Friendship friendship = friendshipRepository.findById(friendshipId)
-                .orElseThrow(() ->
-                        new RuntimeException("Friend request not found"));
-
-        if (!friendship.getReceiverId().equals(receiverId)) {
-            throw new RuntimeException(
-                    "You are not allowed to accept this friend request."
-            );
+                return savedFriendship;
         }
 
-        if (friendship.getStatus() != FriendshipStatus.PENDING) {
-            throw new RuntimeException(
-                    "This friend request has already been processed."
-            );
+
+       public Friendship acceptFriendRequest(
+                Long friendshipId,
+                Long receiverId
+        ) {
+
+                Friendship friendship = friendshipRepository.findById(friendshipId)
+                        .orElseThrow(() ->
+                                new RuntimeException("Friend request not found"));
+
+                if (!friendship.getReceiverId().equals(receiverId)) {
+                        throw new RuntimeException(
+                                "You are not allowed to accept this friend request."
+                        );
+                }
+
+                if (friendship.getStatus() != FriendshipStatus.PENDING) {
+                        throw new RuntimeException(
+                                "This friend request has already been processed."
+                        );
+                }
+
+                friendship.setStatus(FriendshipStatus.ACCEPTED);
+
+                Friendship savedFriendship =
+                        friendshipRepository.save(friendship);
+
+
+                // Get the user who accepted the request
+                User accepter = userRepository.findById(receiverId)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+
+                // Notify the person who originally sent the request
+                notificationService.createNotification(
+                        friendship.getSenderId(),
+                        NotificationType.FRIEND_REQUEST_ACCEPTED,
+                        "Friend request accepted",
+                        accepter.getName() + " accepted your friend request",
+                        receiverId,
+                        null,
+                        null,
+                        null
+                );
+
+
+                return savedFriendship;
         }
-
-        friendship.setStatus(FriendshipStatus.ACCEPTED);
-
-        return friendshipRepository.save(friendship);
-    }
 
 
     public Friendship declineFriendRequest(

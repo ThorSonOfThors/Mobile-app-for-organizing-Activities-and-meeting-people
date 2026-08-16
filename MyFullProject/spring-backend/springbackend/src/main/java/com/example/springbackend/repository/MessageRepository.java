@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
 import com.example.springbackend.entity.Message;
 
@@ -11,5 +12,8 @@ import com.example.springbackend.entity.Message;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     List<Message> findByChatIdOrderBySentAtAsc(Long chatId);
+
+    Optional<Message> findTopByChatIdOrderBySentAtDesc(Long chatId);
+    
 
 }
